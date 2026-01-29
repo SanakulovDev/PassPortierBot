@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # Ma'lumotlar bazasi (Persistent storage)
+  db:
+    image: postgres:15-alpine
+    container_name: passportier_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password}
+      POSTGRES_DB: ${DB_NAME:-passportier_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - passportier_net
+
+  # Sessiyalar uchun vaqtinchalik xotira
+  redis:
+    image: redis:7-alpine
+    container_name: passportier_redis
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - passportier_net
+
+  # Asosiy Go bot
+  bot:
+    build: .
+    container_name: passportier_app
+    restart: always
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_HOST: redis:6379
+    networks:
+      - passportier_net
+
+networks:
+  passportier_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
