@@ -40,7 +40,7 @@ func New(db *gorm.DB) (*telebot.Bot, error) {
 // RegisterHandlers registers all bot command and message handlers.
 func RegisterHandlers(b *telebot.Bot, db *gorm.DB) {
 	b.Handle("/start", handlers.HandleStart())
-	b.Handle("/unlock", handlers.HandleUnlock(b, db))
+	b.Handle("/unlock", handlers.HandleUnlock(b))
 	b.Handle("/get", handlers.HandleGet(b, db))
 	b.Handle("/list", handlers.HandleList(b, db))
 	b.Handle(telebot.OnText, handlers.HandleText(b, db))

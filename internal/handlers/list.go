@@ -45,16 +45,17 @@ func HandleList(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
 }
 
 // buildListMessage creates formatted list of all credentials.
-func buildListMessage(entries []models.PasswordEntry, userKey []byte) string {
+func buildListMessage(entries []models.PasswordEntry, userKey string) string {
+	cm := crypto.NewCryptoManager()
 	var sb strings.Builder
 	sb.WriteString("📋 *Barcha saqlangan ma'lumotlar:*\n\n")
 
 	for i, entry := range entries {
-		decrypted, err := crypto.Decrypt(entry.EncryptedData, userKey)
+		decrypted, err := cm.Decrypt(entry.EncryptedData, userKey)
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("%d. *%s*: ❌ _shifr xatosi_\n", i+1, entry.Service))
 		} else {
-			sb.WriteString(fmt.Sprintf("%d. *%s*: `%s`\n", i+1, entry.Service, string(decrypted)))
+			sb.WriteString(fmt.Sprintf("%d. *%s*: `%s`\n", i+1, entry.Service, decrypted))
 		}
 	}
 

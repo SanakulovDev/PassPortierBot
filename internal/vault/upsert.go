@@ -9,9 +9,10 @@ import (
 )
 
 // UpsertCredential encrypts the data and upserts it into the database.
-// Uses PostgreSQL's ON CONFLICT clause for atomic insert-or-update.
-func UpsertCredential(db *gorm.DB, userID int64, service string, plainData []byte, key []byte) error {
-	encrypted, err := crypto.Encrypt(plainData, key)
+// Uses CryptoManager for Zero-Knowledge encryption with embedded salt.
+func UpsertCredential(db *gorm.DB, userID int64, service string, plainData string, userKey string) error {
+	cm := crypto.NewCryptoManager()
+	encrypted, err := cm.Encrypt(plainData, userKey)
 	if err != nil {
 		return err
 	}
@@ -26,7 +27,7 @@ func UpsertCredential(db *gorm.DB, userID int64, service string, plainData []byt
 }
 
 // buildEntry constructs a PasswordEntry model from the given parameters.
-func buildEntry(userID int64, service string, encrypted []byte) models.PasswordEntry {
+func buildEntry(userID int64, service string, encrypted string) models.PasswordEntry {
 	return models.PasswordEntry{
 		UserID:        userID,
 		Service:       service,

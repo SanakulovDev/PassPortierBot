@@ -18,7 +18,7 @@ func SavePassword(db *gorm.DB, userID int64, service, data string) error {
 		return fmt.Errorf("session not found")
 	}
 
-	return vault.UpsertCredential(db, userID, service, []byte(data), userKey)
+	return vault.UpsertCredential(db, userID, service, data, userKey)
 }
 
 // GetPassword retrieves and decrypts credential from database.

@@ -6,5 +6,5 @@ type PasswordEntry struct {
 	gorm.Model
 	UserID        int64  `gorm:"index"`
 	Service       string
-	EncryptedData []byte // Shifrlangan login/parol
+	EncryptedData string // Base64 encoded: Salt + Nonce + Ciphertext
 }

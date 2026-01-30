@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"fmt"
 	"strings"
 
 	"passportier-bot/internal/crypto"
@@ -11,19 +10,21 @@ import (
 )
 
 // RetrieveCredential finds and decrypts the credential for the given service.
-// Returns the decrypted plaintext or an error if not found or decryption fails.
-func RetrieveCredential(db *gorm.DB, userID int64, service string, key []byte) (string, error) {
+// Returns the decrypted plaintext or crypto.ErrInvalidPassword if key is wrong.
+func RetrieveCredential(db *gorm.DB, userID int64, service string, userKey string) (string, error) {
 	entry, err := findEntry(db, userID, service)
 	if err != nil {
 		return "", err
 	}
 
-	decrypted, err := crypto.Decrypt(entry.EncryptedData, key)
+	cm := crypto.NewCryptoManager()
+	plaintext, err := cm.Decrypt(entry.EncryptedData, userKey)
 	if err != nil {
-		return "", fmt.Errorf("decryption failed: %w", err)
+		// Zero-Knowledge: wrong password manifests as decryption failure
+		return "", err
 	}
 
-	return string(decrypted), nil
+	return plaintext, nil
 }
 
 // findEntry queries the database for a matching credential entry.

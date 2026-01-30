@@ -7,11 +7,10 @@ import (
 	"passportier-bot/internal/services"
 
 	"gopkg.in/telebot.v3"
-	"gorm.io/gorm"
 )
 
 // HandleUnlock returns the /unlock command handler for session authentication.
-func HandleUnlock(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
+func HandleUnlock(b *telebot.Bot) telebot.HandlerFunc {
 	return func(c telebot.Context) error {
 		// Private chat only
 		if c.Chat().Type != telebot.ChatPrivate {
@@ -28,11 +27,9 @@ func HandleUnlock(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
 			return c.Send("⚠️ Iltimos, maxfiy so'z kiriting! Misol: `/unlock mySecretPass`", telebot.ModeMarkdown)
 		}
 
-		if err := services.UnlockSession(db, c.Sender().ID, passphrase); err != nil {
-			return c.Send("❌ Tizim xatosi.")
-		}
+		services.UnlockSession(c.Sender().ID, passphrase)
 
-		return c.Send("🔓 Sessiya ochildi! Sizning kalitingiz Argon2id bilan shifrlanib, 30 daqiqa RAMda saqlanadi.")
+		return c.Send("🔓 Sessiya ochildi! Kalitingiz 30 daqiqa RAMda saqlanadi. Har bir shifrlovda yangi salt yaratiladi.")
 	}
 }
 

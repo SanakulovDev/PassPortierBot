@@ -19,15 +19,6 @@ func cleanupSession(userID int64, version int64) {
 	// and we should NOT delete the new active session.
 	if session.version == version {
 		log.Printf("[VAULT] Auto-expiring session for user %d", userID)
-		wipe(session.key)
 		delete(sessions, userID)
-	}
-}
-
-// wipe zeroes out a byte slice to prevent memory dumps from leaking keys.
-// Note: Go's garbage collector/runtime might relocate memory, but this is best-effort.
-func wipe(data []byte) {
-	for i := range data {
-		data[i] = 0
 	}
 }
