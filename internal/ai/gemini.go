@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -38,12 +42,16 @@ func ParseInput(ctx context.Context, mimeType string, data []byte) (*Credential,
 	parts = append(parts, promptPart)
 
 	if len(data) > 0 {
-		parts = append(parts, &genai.Part{
-			InlineData: &genai.Blob{
-				MIMEType: mimeType,
-				Data:     data,
-			},
-		})
+		if mimeType == "text/plain" {
+			parts = append(parts, &genai.Part{Text: string(data)})
+		} else {
+			parts = append(parts, &genai.Part{
+				InlineData: &genai.Blob{
+					MIMEType: mimeType,
+					Data:     data,
+				},
+			})
+		}
 	}
 
 	// Construct the request content.
@@ -53,11 +61,43 @@ func ParseInput(ctx context.Context, mimeType string, data []byte) (*Credential,
 		},
 	}
 
-	// Call GenerateContent.
+	// Call GenerateContent with retry logic.
 	// Note: We use "gemini-2.0-flash" as requested.
-	resp, err := client.Models.GenerateContent(ctx, "gemini-2.0-flash", contents, nil)
-	if err != nil {
-		return nil, fmt.Errorf("generate content error: %w", err)
+	var resp *genai.GenerateContentResponse
+
+	maxRetries := 5
+	baseDelay := 2 * time.Second
+	retryRegex := regexp.MustCompile(`Please retry in (\d+(\.\d+)?)s`)
+
+	for i := 0; i <= maxRetries; i++ {
+		resp, err = client.Models.GenerateContent(ctx, "gemini-2.0-flash", contents, nil)
+		if err == nil {
+			break
+		}
+
+		// Check for rate limit errors
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "429") || strings.Contains(errMsg, "RESOURCE_EXHAUSTED") || strings.Contains(errMsg, "quota") {
+			if i < maxRetries {
+				waitDuration := baseDelay * time.Duration(1<<i)
+
+				// Try to parse specific wait time from error
+				matches := retryRegex.FindStringSubmatch(errMsg)
+				if len(matches) > 1 {
+					if val, parseErr := strconv.ParseFloat(matches[1], 64); parseErr == nil {
+						// Add 1 second buffer
+						waitDuration = time.Duration(val*float64(time.Second)) + 1*time.Second
+					}
+				}
+
+				log.Printf("[WARNING] Gemini rate limit hit. Retrying in %v... (Attempt %d/%d)", waitDuration, i+1, maxRetries)
+				time.Sleep(waitDuration)
+				continue
+			}
+		}
+
+		// If other error or retries exhausted
+		return nil, fmt.Errorf("generate content error (after %d retries): %w", i, err)
 	}
 
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {

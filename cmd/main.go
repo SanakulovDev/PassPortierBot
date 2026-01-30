@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"gopkg.in/telebot.v3"
+	"gopkg.in/telebot.v3/middleware"
 )
 
 func main() {
@@ -32,6 +34,13 @@ func main() {
 	pref := telebot.Settings{
 		Token:  os.Getenv("BOT_TOKEN"),
 		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
+		OnError: func(err error, c telebot.Context) {
+			if c != nil {
+				log.Printf("[ERROR] Update %v failed: %v", c.Update().ID, err)
+			} else {
+				log.Printf("[ERROR] Bot error: %v", err)
+			}
+		},
 	}
 
 	b, err := telebot.NewBot(pref)
@@ -40,27 +49,60 @@ func main() {
 		return
 	}
 
-	// Middleware to check if user has an active session (for protected commands if needed)
-	// However, distinct handlers will check it manually for finer control.
+	// Middleware
+	b.Use(middleware.Logger())
 
-	// /unlock [key] - Set Master Key in RAM
+	// /start - Welcome message
+	b.Handle("/start", func(c telebot.Context) error {
+		msg := "👋 <b>Assalomu alaykum, PassPortierBot-ga xush kelibsiz!</b>\n\n" +
+			"Men sizning parollaringizni xavfsiz saqlashga yordam beraman. 🔐\n" +
+			"Mening ishlash prinsipim <b>Zero-Knowledge</b> texnologiyasiga asoslangan: sizning maxfiy kalitingiz faqat vaqtinchalik xotirada (RAM) saqlanadi.\n\n" +
+			"🚀 <b>Ishni boshlash uchun:</b>\n" +
+			"1. <code>/unlock [maxfiy_so'z]</code> - Sessiyani ochish (kalit 30 daqiqa RAMda turadi).\n" +
+			"2. Login/parol yuboring (yozma, rasm yoki ovozli).\n" +
+			"3. <code>/get [xizmat_nomi]</code> - Parolni olish.\n\n" +
+			"🔒 <b>Xavfsizlik:</b> Har bir ma'lumot AES-256-GCM shifrlash usuli bilan himoyalangan."
+		return c.Send(msg, telebot.ModeHTML)
+	})
+
+	// /unlock [passphrase] - Generate 32-byte AES Key from passphrase using SHA-256 and store in RAM
 	b.Handle("/unlock", func(c telebot.Context) error {
-		key := c.Message().Payload
-		if len(key) != 32 {
-			return c.Send("⚠️ Master Key roppa-rosa 32 ta belgidan iborat bo'lishi kerak!")
+		// Manual parsing to be safe
+		args := strings.SplitN(c.Text(), " ", 2)
+		if len(args) < 2 {
+			return c.Send("⚠️ Iltimos, maxfiy so'z kiriting! Misol: `/unlock mySecretPass`", telebot.ModeMarkdown)
 		}
-		vault.SetKey(c.Sender().ID, []byte(key))
-		return c.Send("🔓 Sessiya ochildi! Endi 30 daqiqa davomida ma'lumot yuborishingiz mumkin.")
+		passphrase := strings.TrimSpace(args[1])
+		if passphrase == "" {
+			return c.Send("⚠️ Iltimos, maxfiy so'z kiriting!", telebot.ModeMarkdown)
+		}
+
+		// Foydalanuvchi kiritgan so'zdan 32 baytlik kalit yasash (SHA-256)
+		hash := sha256.Sum256([]byte(passphrase))
+		vault.SetKey(c.Sender().ID, hash[:])
+
+		log.Printf("[DEBUG] User %d unlocked session. Passphrase len: %d. Key set.", c.Sender().ID, len(passphrase))
+		return c.Send("🔓 Sessiya ochildi! Siz kiritgan so'zdan maxsus 32-baytlik shifrlash kaliti yasald.\nEndi 30 daqiqa davomida ma'lumot yuborishingiz mumkin.")
 	})
 
 	// /get [service] - Retrieve and decrypt password
 	b.Handle("/get", func(c telebot.Context) error {
+		log.Printf("[DEBUG] /get request from User %d", c.Sender().ID)
 		userKey, ok := vault.GetKey(c.Sender().ID)
 		if !ok {
-			return c.Send("🔒 Sessiya yopiq. Avval /unlock [key] buyrug'ini yuboring.")
+			log.Printf("[DEBUG] User %d session NOT found", c.Sender().ID)
+			return c.Send("🔒 Sessiya yopiq. Avval `/unlock [so'z]` buyrug'ini yuboring.", telebot.ModeMarkdown)
 		}
 
 		serviceName := strings.TrimSpace(c.Message().Payload)
+		if serviceName == "" {
+			// Try manual parse if Payload fails
+			args := strings.SplitN(c.Text(), " ", 2)
+			if len(args) >= 2 {
+				serviceName = strings.TrimSpace(args[1])
+			}
+		}
+
 		if serviceName == "" {
 			return c.Send("⚠️ Qaysi xizmatni qidiryapsiz? Misol: /get google")
 		}
@@ -74,6 +116,7 @@ func main() {
 
 		decrypted, err := crypto.Decrypt(entry.EncryptedData, userKey)
 		if err != nil {
+			log.Printf("[ERROR] Decryption failed for User %d Service %s: %v", c.Sender().ID, serviceName, err)
 			return c.Send("❌ Shifrni ochib bo'lmadi. Kalit noto'g'ri bo'lishi mumkin.")
 		}
 
@@ -84,6 +127,7 @@ func main() {
 	processContent := func(c telebot.Context, mimeType string, data []byte) error {
 		userKey, ok := vault.GetKey(c.Sender().ID)
 		if !ok {
+			log.Printf("[DEBUG] User %d session NOT found during content processing", c.Sender().ID)
 			return c.Send("🔒 Sessiya yopiq. Avval /unlock [key] buyrug'ini yuboring.")
 		}
 
@@ -94,9 +138,12 @@ func main() {
 
 		cred, err := ai.ParseInput(context.Background(), mimeType, data)
 		if err != nil {
+			log.Printf("[ERROR] AI ParseInput failed: %v", err)
 			b.Delete(msg)
 			return c.Send(fmt.Sprintf("❌ AI xatosi: %v", err))
 		}
+
+		log.Printf("[DEBUG] AI Response: %+v", cred)
 
 		// Encrypt the full JSON credential as one blob
 		credJSON := fmt.Sprintf(`{"service":"%s", "login":"%s", "password":"%s", "note":"%s"}`,
@@ -171,5 +218,11 @@ func main() {
 	})
 
 	log.Println("PassPortierBot is running...")
+
+	// Explicitly remove webhook to ensure polling works
+	if err := b.RemoveWebhook(); err != nil {
+		log.Printf("Warning: Failed to remove webhook: %v", err)
+	}
+
 	b.Start()
 }
