@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -123,13 +124,24 @@ func main() {
 
 	// Handle Text
 	b.Handle(telebot.OnText, func(c telebot.Context) error {
+		// Xavfsizlik uchun foydalanuvchi xabarini o'chiramiz (defer orqali funksiya oxirida)
+		defer func() {
+			if err := b.Delete(c.Message()); err != nil {
+				log.Println("Warning: Failed to delete user message:", err)
+			}
+		}()
+
 		text := strings.TrimSpace(c.Text())
 
 		// Check if it starts with #
 		if strings.HasPrefix(text, "#") {
 			// Remove #
 			cleanText := strings.TrimPrefix(text, "#")
-			parts := strings.SplitN(cleanText, " ", 2)
+
+			// Split by whitespace (newline, space, etc.)
+			// We use regex to find the first whitespace separator
+			re := regexp.MustCompile(`\s+`)
+			parts := re.Split(strings.TrimSpace(cleanText), 2)
 
 			serviceName := strings.TrimSpace(parts[0])
 			if serviceName == "" {
