@@ -31,10 +31,10 @@ func GetPassword(db *gorm.DB, userID int64, service string) (string, error) {
 	return vault.RetrieveCredential(db, userID, service, userKey)
 }
 
-// ScheduleExpiration edits message to show expiration notice after 5 minutes.
+// ScheduleExpiration edits message to show expiration notice after 10 seconds.
 func ScheduleExpiration(b *telebot.Bot, msg *telebot.Message) {
 	go func(m *telebot.Message) {
-		time.Sleep(5 * time.Minute)
+		time.Sleep(10 * time.Second)
 		expiredText := "⏰ *Muddati tugadi*\n\n_Xavfsizlik sababli bu ma'lumot yashirildi._"
 		if _, err := b.Edit(m, expiredText, telebot.ModeMarkdown); err != nil {
 			log.Printf("Warning: Failed to edit expired message (id %d): %v", m.ID, err)

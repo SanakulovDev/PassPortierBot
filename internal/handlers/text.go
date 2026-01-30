@@ -75,7 +75,7 @@ func handleRetrieve(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName 
 		return c.Send(fmt.Sprintf("❌ *%s* bo'yicha ma'lumot topilmadi.", serviceName), telebot.ModeMarkdown)
 	}
 
-	msgText := fmt.Sprintf("🔑 *%s*\n\n`%s`\n\n⚠️ _Bu xabar xavfsizlik uchun 5 daqiqadan so'ng yashiriladi._", serviceName, decrypted)
+	msgText := fmt.Sprintf("🔑 *%s*\n\n`%s`\n\n⚠️ _Bu xabar xavfsizlik uchun 10 soniyadan so'ng yashiriladi._", serviceName, decrypted)
 	sentMsg, err := b.Send(c.Sender(), msgText, telebot.ModeMarkdown)
 	if err != nil {
 		return err
