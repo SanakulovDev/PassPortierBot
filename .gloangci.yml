@@ -1,0 +1,16 @@
+linters-settings:
+  funlen:
+    lines: 60      # Har bir funksiya/metod ko'pi bilan 60 qator bo'lishi shart
+    statements: 40 
+  gocognit:
+    min-complexity: 10 # Kod juda murakkab bo'lib ketmasligini tekshiradi
+
+linters:
+  enable:
+    - funlen    # Funksiya uzunligini tekshiradi
+    - gocognit  # Kognitiv murakkablikni tekshiradi
+    - stylecheck
+    - unused
+
+# Metodlar sonini tekshirish uchun maxsus qoida yo'q, 
+# lekin 'funlen' va 'gocognit' orqali kodni kichik bo'laklarga majburlash mumkin.
