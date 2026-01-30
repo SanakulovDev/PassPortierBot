@@ -1,16 +1,13 @@
 package main
 
 import (
-	"context"
 	"crypto/sha256"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strings"
 	"time"
 
-	"passportier-bot/internal/ai"
 	"passportier-bot/internal/crypto"
 	"passportier-bot/internal/models"
 	"passportier-bot/internal/storage"
@@ -19,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	"gopkg.in/telebot.v3"
 	"gopkg.in/telebot.v3/middleware"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -123,99 +121,94 @@ func main() {
 		return c.Send(fmt.Sprintf("🔑 *%s*\n\n%s", entry.Service, string(decrypted)), telebot.ModeMarkdown)
 	})
 
-	// Helper function to process content via AI
-	processContent := func(c telebot.Context, mimeType string, data []byte) error {
-		userKey, ok := vault.GetKey(c.Sender().ID)
-		if !ok {
-			log.Printf("[DEBUG] User %d session NOT found during content processing", c.Sender().ID)
-			return c.Send("🔒 Sessiya yopiq. Avval /unlock [key] buyrug'ini yuboring.")
-		}
-
-		msg, err := b.Send(c.Sender(), "⏳ AI tahlil qilmoqda...")
-		if err != nil {
-			log.Println("Send error:", err)
-		}
-
-		cred, err := ai.ParseInput(context.Background(), mimeType, data)
-		if err != nil {
-			log.Printf("[ERROR] AI ParseInput failed: %v", err)
-			b.Delete(msg)
-			return c.Send(fmt.Sprintf("❌ AI xatosi: %v", err))
-		}
-
-		log.Printf("[DEBUG] AI Response: %+v", cred)
-
-		// Encrypt the full JSON credential as one blob
-		credJSON := fmt.Sprintf(`{"service":"%s", "login":"%s", "password":"%s", "note":"%s"}`,
-			cred.Service, cred.Login, cred.Password, cred.Note)
-
-		encrypted, err := crypto.Encrypt([]byte(credJSON), userKey)
-		if err != nil {
-			b.Delete(msg)
-			return c.Send("❌ Shifrlash xatosi.")
-		}
-
-		// Save to DB
-		entry := models.PasswordEntry{
-			UserID:        c.Sender().ID,
-			Service:       cred.Service,
-			EncryptedData: encrypted,
-		}
-
-		if err := db.Create(&entry).Error; err != nil {
-			b.Delete(msg)
-			return c.Send("❌ Bazaga saqlash xatosi.")
-		}
-
-		b.Delete(msg)
-		return c.Send(fmt.Sprintf("✅ *%s* saqlandi!\nLogin: `%s`", cred.Service, cred.Login), telebot.ModeMarkdown)
-	}
-
 	// Handle Text
 	b.Handle(telebot.OnText, func(c telebot.Context) error {
-		// Ignore commands
-		if strings.HasPrefix(c.Text(), "/") {
-			return nil
+		text := strings.TrimSpace(c.Text())
+
+		// Check if it starts with #
+		if strings.HasPrefix(text, "#") {
+			// Remove #
+			cleanText := strings.TrimPrefix(text, "#")
+			parts := strings.SplitN(cleanText, " ", 2)
+
+			serviceName := strings.TrimSpace(parts[0])
+			if serviceName == "" {
+				return c.Send("⚠️ Iltimos, xizmat nomini hash bilan yozing. Misol: `#instagram` yoki `#instagram parol123`")
+			}
+
+			// Case 1: SAVE (#key data)
+			if len(parts) > 1 {
+				data := strings.TrimSpace(parts[1])
+				if data == "" {
+					// Edge case where there is just whitespace
+					return retrievePassword(c, db, serviceName)
+				}
+				return savePassword(c, b, db, serviceName, data)
+			}
+
+			// Case 2: GET (#key)
+			return retrievePassword(c, db, serviceName)
 		}
-		return processContent(c, "text/plain", []byte(c.Text()))
+
+		// If not starting with #, maybe just chat or ignore
+		return c.Send("⚠️ Ma'lumot saqlash uchun `#xizmat_nomi ma'lumot` ko'rinishida yozing.\nOlish uchun esa shunchaki `#xizmat_nomi` deb yozing.")
 	})
+}
 
-	// Handle Photo
-	b.Handle(telebot.OnPhoto, func(c telebot.Context) error {
-		file := c.Message().Photo.File
-		reader, err := b.File(&file)
-		if err != nil {
-			return c.Send("❌ Rasmni yuklab bo'lmadi.")
-		}
-		defer reader.Close()
+func savePassword(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName, data string) error {
+	userKey, ok := vault.GetKey(c.Sender().ID)
+	if !ok {
+		return c.Send("🔒 Sessiya yopiq. Avval `/unlock [so'z]` buyrug'ini yuboring.")
+	}
 
-		data, err := io.ReadAll(reader)
-		if err != nil {
-			return c.Send("❌ Rasmni o'qib bo'lmadi.")
-		}
+	msg, err := b.Send(c.Sender(), "⏳ Saqlanmoqda...")
+	if err != nil {
+		log.Println("Send error:", err)
+	}
 
-		return processContent(c, "image/jpeg", data)
-	})
+	// Encrypt the data as is (it's up to user format now)
+	encrypted, err := crypto.Encrypt([]byte(data), userKey)
+	if err != nil {
+		b.Delete(msg)
+		return c.Send("❌ Shifrlash xatosi.")
+	}
 
-	// Handle Voice
-	b.Handle(telebot.OnVoice, func(c telebot.Context) error {
-		file := c.Message().Voice.File
-		reader, err := b.File(&file)
-		if err != nil {
-			return c.Send("❌ Ovozli xabarni yuklab bo'lmadi.")
-		}
-		defer reader.Close()
+	// Save to DB
+	entry := models.PasswordEntry{
+		UserID:        c.Sender().ID,
+		Service:       serviceName,
+		EncryptedData: encrypted,
+	}
 
-		data, err := io.ReadAll(reader)
-		if err != nil {
-			return c.Send("❌ Ovozli xabarni o'qib bo'lmadi.")
-		}
+	if err := db.Create(&entry).Error; err != nil {
+		b.Delete(msg)
+		return c.Send("❌ Bazaga saqlash xatosi.")
+	}
 
-		// AI usually supports audio/mp3 or audio/wav. Telegram voice is usually OGG/Opus.
-		// Gemini supports various audio formats. We'll verify mimetype or convert if needed.
-		// For now, passing generic audio type or "audio/ogg".
-		return processContent(c, "audio/ogg", data)
-	})
+	b.Delete(msg)
+	return c.Send(fmt.Sprintf("✅ *%s* saqlandi!", serviceName), telebot.ModeMarkdown)
+}
+
+func retrievePassword(c telebot.Context, db *gorm.DB, serviceName string) error {
+	userKey, ok := vault.GetKey(c.Sender().ID)
+	if !ok {
+		return c.Send("🔒 Sessiya yopiq. Avval `/unlock [so'z]` buyrug'ini yuboring.")
+	}
+
+	var entry models.PasswordEntry
+	// Case-insensitive search
+	result := db.Where("user_id = ? AND LOWER(service) LIKE ?", c.Sender().ID, "%"+strings.ToLower(serviceName)+"%").First(&entry)
+	if result.Error != nil {
+		return c.Send(fmt.Sprintf("❌ *%s* bo'yicha ma'lumot topilmadi.", serviceName), telebot.ModeMarkdown)
+	}
+
+	decrypted, err := crypto.Decrypt(entry.EncryptedData, userKey)
+	if err != nil {
+		log.Printf("[ERROR] Decryption failed for User %d Service %s: %v", c.Sender().ID, serviceName, err)
+		return c.Send("❌ Shifrni ochib bo'lmadi. Kalit noto'g'ri bo'lishi mumkin.")
+	}
+
+	return c.Send(fmt.Sprintf("🔑 *%s*\n\n`%s`", entry.Service, string(decrypted)), telebot.ModeMarkdown)
 
 	log.Println("PassPortierBot is running...")
 
