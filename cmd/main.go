@@ -153,6 +153,15 @@ func main() {
 		// If not starting with #, maybe just chat or ignore
 		return c.Send("⚠️ Ma'lumot saqlash uchun `#xizmat_nomi ma'lumot` ko'rinishida yozing.\nOlish uchun esa shunchaki `#xizmat_nomi` deb yozing.")
 	})
+
+	log.Println("PassPortierBot is running...")
+
+	// Explicitly remove webhook to ensure polling works
+	if err := b.RemoveWebhook(); err != nil {
+		log.Printf("Warning: Failed to remove webhook: %v", err)
+	}
+
+	b.Start()
 }
 
 func savePassword(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName, data string) error {
@@ -209,13 +218,4 @@ func retrievePassword(c telebot.Context, db *gorm.DB, serviceName string) error 
 	}
 
 	return c.Send(fmt.Sprintf("🔑 *%s*\n\n`%s`", entry.Service, string(decrypted)), telebot.ModeMarkdown)
-
-	log.Println("PassPortierBot is running...")
-
-	// Explicitly remove webhook to ensure polling works
-	if err := b.RemoveWebhook(); err != nil {
-		log.Printf("Warning: Failed to remove webhook: %v", err)
-	}
-
-	b.Start()
 }
