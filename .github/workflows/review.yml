@@ -35,6 +35,18 @@ jobs:
       - name: Build Docker Image
         id: docker
         run: docker compose build
+        
+      - name: Check method count per file
+        run: |
+          # Har bir Go faylini tekshiramiz
+          find . -name "*.go" -not -path "./vendor/*" | while read file; do
+            # 'func' so'zi bilan boshlanadigan qatorlarni sanaymiz
+            count=$(grep -c "^func " "$file")
+            if [ $count -gt 4 ]; then
+              echo "❌ Error: $file faylida $count ta metod bor (limit: 4)"
+              exit 1
+            fi
+          done
 
       # Yagona Telegram xabari
       - name: Send Telegram Notification
