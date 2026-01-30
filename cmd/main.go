@@ -29,9 +29,10 @@ func main() {
 
 	// Initialize Database
 	db := storage.InitDB()
-	// Migrate new User table
-	if err := db.AutoMigrate(&models.User{}); err != nil {
-		log.Fatal("User Migration Failed:", err)
+	// Migrate new User table and update PasswordEntry
+	if err := db.AutoMigrate(&models.User{}, &models.PasswordEntry{}); err != nil {
+		log.Printf("Migration Failed: %v. (Check if you have duplicate data preventing unique index)", err)
+		// We don't fatal here to allow debugging, but upserts will fail if index is missing
 	}
 
 	// Initialize Bot
