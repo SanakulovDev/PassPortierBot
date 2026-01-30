@@ -45,4 +45,7 @@ func RegisterHandlers(b *telebot.Bot, db *gorm.DB) {
 	b.Handle("/get", handlers.HandleGet(b, db))
 	b.Handle("/list", handlers.HandleList(b, db))
 	b.Handle(telebot.OnText, handlers.HandleText(b, db))
+
+	// Register inline button callbacks
+	handlers.RegisterListCallbacks(b, db)
 }
