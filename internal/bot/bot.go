@@ -41,6 +41,7 @@ func New(db *gorm.DB) (*telebot.Bot, error) {
 func RegisterHandlers(b *telebot.Bot, db *gorm.DB) {
 	b.Handle("/start", handlers.HandleStart())
 	b.Handle("/unlock", handlers.HandleUnlock(b))
+	b.Handle("/lock", handlers.HandleLock(b))
 	b.Handle("/get", handlers.HandleGet(b, db))
 	b.Handle("/list", handlers.HandleList(b, db))
 	b.Handle(telebot.OnText, handlers.HandleText(b, db))

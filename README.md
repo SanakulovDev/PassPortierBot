@@ -34,6 +34,7 @@
 |---------|-------------|
 | `/start` | Welcome message |
 | `/unlock [password]` | Open session (30 min) |
+| `/lock` | 🔒 Close session immediately |
 | `/list` | Show ALL saved secrets |
 | `/get [service]` | Get single secret |
 | `#service data` | Save/Update secret |
