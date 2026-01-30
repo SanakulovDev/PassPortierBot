@@ -28,7 +28,6 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          annotate: true
 
   docker-check:
     runs-on: ubuntu-latest
@@ -44,4 +43,4 @@ jobs:
 
       - name: Build Docker Image (Check)
         run: |
-          docker-compose build
+          docker compose build
