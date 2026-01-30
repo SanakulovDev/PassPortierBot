@@ -67,7 +67,7 @@ func handleSave(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName, dat
 	return c.Send(fmt.Sprintf("✅ *%s* saqlandi!", serviceName), telebot.ModeMarkdown)
 }
 
-// handleRetrieve retrieves password with expiration notice.
+// handleRetrieve retrieves password with countdown timer.
 func handleRetrieve(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName string) error {
 	decrypted, err := services.GetPassword(db, c.Sender().ID, serviceName)
 	if err != nil {
@@ -75,12 +75,15 @@ func handleRetrieve(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName 
 		return c.Send(fmt.Sprintf("❌ *%s* bo'yicha ma'lumot topilmadi.", serviceName), telebot.ModeMarkdown)
 	}
 
-	msgText := fmt.Sprintf("🔑 *%s*\n\n`%s`\n\n⚠️ _Bu xabar xavfsizlik uchun 10 soniyadan so'ng yashiriladi._", serviceName, decrypted)
+	// Original text without countdown (for countdown updates)
+	originalText := fmt.Sprintf("🔑 *%s*\n\n`%s`", serviceName, decrypted)
+	msgText := fmt.Sprintf("%s\n\n⏱ _Yashirilishiga 30 soniya qoldi..._", originalText)
+
 	sentMsg, err := b.Send(c.Sender(), msgText, telebot.ModeMarkdown)
 	if err != nil {
 		return err
 	}
 
-	services.ScheduleExpiration(b, sentMsg)
+	services.ScheduleCountdown(b, sentMsg, originalText)
 	return nil
 }

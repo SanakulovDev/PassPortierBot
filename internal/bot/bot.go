@@ -33,6 +33,7 @@ func New(db *gorm.DB) (*telebot.Bot, error) {
 
 	b.Use(middleware.Logger())
 	RegisterHandlers(b, db)
+	SetCommands(b)
 
 	return b, nil
 }
@@ -48,4 +49,21 @@ func RegisterHandlers(b *telebot.Bot, db *gorm.DB) {
 
 	// Register inline button callbacks
 	handlers.RegisterListCallbacks(b, db)
+}
+
+// SetCommands registers bot commands with Telegram for the menu.
+func SetCommands(b *telebot.Bot) {
+	commands := []telebot.Command{
+		{Text: "start", Description: "🚀 Botni ishga tushirish"},
+		{Text: "unlock", Description: "🔓 Sessiyani ochish (30 daqiqa)"},
+		{Text: "lock", Description: "🔒 Sessiyani yopish"},
+		{Text: "list", Description: "📋 Barcha ma'lumotlarni ko'rish"},
+		{Text: "get", Description: "🔍 Ma'lumot olish (masalan: /get instagram)"},
+	}
+
+	if err := b.SetCommands(commands); err != nil {
+		log.Printf("Warning: Failed to set commands: %v", err)
+	} else {
+		log.Println("[BOT] Commands registered successfully")
+	}
 }
