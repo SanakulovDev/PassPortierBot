@@ -178,7 +178,9 @@ func savePassword(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName, d
 	// Encrypt the data as is (it's up to user format now)
 	encrypted, err := crypto.Encrypt([]byte(data), userKey)
 	if err != nil {
-		b.Delete(msg)
+		if err := b.Delete(msg); err != nil {
+			log.Println("Warning: Failed to delete saving message:", err)
+		}
 		return c.Send("❌ Shifrlash xatosi.")
 	}
 
@@ -190,11 +192,15 @@ func savePassword(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName, d
 	}
 
 	if err := db.Create(&entry).Error; err != nil {
-		b.Delete(msg)
+		if err := b.Delete(msg); err != nil {
+			log.Println("Warning: Failed to delete saving message:", err)
+		}
 		return c.Send("❌ Bazaga saqlash xatosi.")
 	}
 
-	b.Delete(msg)
+	if err := b.Delete(msg); err != nil {
+		log.Println("Warning: Failed to delete saving message:", err)
+	}
 	return c.Send(fmt.Sprintf("✅ *%s* saqlandi!", serviceName), telebot.ModeMarkdown)
 }
 

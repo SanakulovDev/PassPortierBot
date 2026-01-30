@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"passportier-bot/internal/models"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -19,6 +20,8 @@ func InitDB() *gorm.DB {
 	}
 
 	// Jadvalni avtomatik yaratish
-	db.AutoMigrate(&models.PasswordEntry{})
+	if err := db.AutoMigrate(&models.PasswordEntry{}); err != nil {
+		panic("Migratsiya xatosi: " + err.Error())
+	}
 	return db
 }
