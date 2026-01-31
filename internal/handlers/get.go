@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
 
+	"passportier-bot/internal/security"
 	"passportier-bot/internal/services"
 
 	"gopkg.in/telebot.v3"
@@ -12,7 +14,7 @@ import (
 )
 
 // HandleGet returns the /get command handler for password retrieval.
-func HandleGet(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
+func HandleGet(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) telebot.HandlerFunc {
 	return func(c telebot.Context) error {
 		// Delete message for security
 		if err := b.Delete(c.Message()); err != nil {
@@ -24,7 +26,7 @@ func HandleGet(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
 			return c.Send("⚠️ Qaysi xizmatni qidiryapsiz? Misol: /get google")
 		}
 
-		decrypted, err := services.GetPassword(db, c.Sender().ID, serviceName)
+		decrypted, err := services.GetPassword(context.Background(), db, sm, c.Sender().ID, serviceName)
 		if err != nil {
 			log.Printf("[ERROR] Get failed for User %d Service %s: %v", c.Sender().ID, serviceName, err)
 			return c.Send("❌ Topilmadi yoki sessiya yopiq. `/unlock` ni tekshiring.", telebot.ModeMarkdown)

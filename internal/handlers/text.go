@@ -1,19 +1,22 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"regexp"
 	"strings"
 
+	"passportier-bot/internal/security"
 	"passportier-bot/internal/services"
 
 	"gopkg.in/telebot.v3"
 	"gorm.io/gorm"
 )
 
-// HandleText returns the text handler for hash-based save/retrieve (#service).
-func HandleText(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
+// HandleText returns the text handler for hash-based retrieval (#service).
+// Saving via text (#service data) is deprecated in V2.0.
+func HandleText(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) telebot.HandlerFunc {
 	return func(c telebot.Context) error {
 		// Delete user message for security
 		defer func() {
@@ -25,18 +28,20 @@ func HandleText(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
 		text := strings.ToLower(strings.TrimSpace(c.Text()))
 
 		if !strings.HasPrefix(text, "#") {
-			return c.Send("⚠️ Ma'lumot saqlash uchun `#xizmat_nomi ma'lumot` ko'rinishida yozing.\nOlish uchun esa shunchaki `#xizmat_nomi` deb yozing.")
+			return nil // Ignore non-command text
 		}
 
 		serviceName, data := parseHashInput(text)
 		if serviceName == "" {
-			return c.Send("⚠️ Iltimos, xizmat nomini hash bilan yozing. Misol: `#instagram` yoki `#instagram parol123`")
+			return c.Send("⚠️ Xizmat nomini hash bilan yozing. Misol: `#instagram`")
 		}
 
+		// Block text-based saving
 		if data != "" {
-			return handleSave(c, b, db, serviceName, data)
+			return c.Send("🛑 Matn orqali saqlash o'chirilgan.\nIltimos, pastdagi 'Add Password' tugmasidan foydalaning.")
 		}
-		return handleRetrieve(c, b, db, serviceName)
+
+		return handleRetrieve(c, b, db, sm, serviceName)
 	}
 }
 
@@ -53,26 +58,14 @@ func parseHashInput(text string) (service, data string) {
 	return
 }
 
-// handleSave saves password with loading indicator.
-func handleSave(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName, data string) error {
-	msg, _ := b.Send(c.Sender(), "⏳ Saqlanmoqda...")
 
-	if err := services.SavePassword(db, c.Sender().ID, serviceName, data); err != nil {
-		b.Delete(msg)
-		log.Printf("Save error: %v", err)
-		return c.Send("❌ Saqlash xatosi. Sessiya yopiq bo'lishi mumkin.")
-	}
-
-	b.Delete(msg)
-	return c.Send(fmt.Sprintf("✅ *%s* saqlandi!", serviceName), telebot.ModeMarkdown)
-}
 
 // handleRetrieve retrieves password with countdown timer.
-func handleRetrieve(c telebot.Context, b *telebot.Bot, db *gorm.DB, serviceName string) error {
-	decrypted, err := services.GetPassword(db, c.Sender().ID, serviceName)
+func handleRetrieve(c telebot.Context, b *telebot.Bot, db *gorm.DB, sm *security.SessionManager, serviceName string) error {
+	decrypted, err := services.GetPassword(context.Background(), db, sm, c.Sender().ID, serviceName)
 	if err != nil {
 		log.Printf("[ERROR] Retrieve failed: %v", err)
-		return c.Send(fmt.Sprintf("❌ *%s* bo'yicha ma'lumot topilmadi.", serviceName), telebot.ModeMarkdown)
+		return c.Send(fmt.Sprintf("❌ *%s* bo'yicha ma'lumot topilmadi yoki sessiya yopiq.", serviceName), telebot.ModeMarkdown)
 	}
 
 	// Original text without countdown (for countdown updates)

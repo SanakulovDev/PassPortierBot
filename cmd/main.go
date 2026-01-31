@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"passportier-bot/internal/bot"
 	"passportier-bot/internal/models"
+	"passportier-bot/internal/security"
 	"passportier-bot/internal/storage"
 
 	"github.com/joho/godotenv"
@@ -24,8 +26,15 @@ func main() {
 		log.Printf("Migration Failed: %v", err)
 	}
 
+	// Initialize Redis and SessionManager
+	redisClient, err := security.NewRedisClient(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	sessionManager := security.NewSessionManager(redisClient)
+
 	// Initialize and start bot
-	b, err := bot.New(db)
+	b, err := bot.New(db, sessionManager)
 	if err != nil {
 		log.Fatal(err)
 	}

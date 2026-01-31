@@ -1,10 +1,12 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
 
+	"passportier-bot/internal/security"
 	"passportier-bot/internal/vault"
 
 	"gopkg.in/telebot.v3"
@@ -12,9 +14,9 @@ import (
 )
 
 // SavePassword encrypts and saves credential to database.
-func SavePassword(db *gorm.DB, userID int64, service, data string) error {
-	userKey, ok := vault.GetKey(userID)
-	if !ok {
+func SavePassword(ctx context.Context, db *gorm.DB, sm *security.SessionManager, userID int64, service, data string) error {
+	userKey, err := sm.GetSession(ctx, userID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
@@ -22,9 +24,9 @@ func SavePassword(db *gorm.DB, userID int64, service, data string) error {
 }
 
 // GetPassword retrieves and decrypts credential from database.
-func GetPassword(db *gorm.DB, userID int64, service string) (string, error) {
-	userKey, ok := vault.GetKey(userID)
-	if !ok {
+func GetPassword(ctx context.Context, db *gorm.DB, sm *security.SessionManager, userID int64, service string) (string, error) {
+	userKey, err := sm.GetSession(ctx, userID)
+	if err != nil {
 		return "", fmt.Errorf("session not found")
 	}
 

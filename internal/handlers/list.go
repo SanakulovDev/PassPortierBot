@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	"passportier-bot/internal/crypto"
 	"passportier-bot/internal/models"
+	"passportier-bot/internal/security"
 	"passportier-bot/internal/vault"
 
 	"gopkg.in/telebot.v3"
@@ -20,32 +22,32 @@ const (
 )
 
 // HandleList returns the /list command handler with pagination support.
-func HandleList(b *telebot.Bot, db *gorm.DB) telebot.HandlerFunc {
+func HandleList(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) telebot.HandlerFunc {
 	return func(c telebot.Context) error {
 		if err := b.Delete(c.Message()); err != nil {
 			log.Println("Warning: Failed to delete list message:", err)
 		}
 
-		return showListPage(b, c, db, 0)
+		return showListPage(b, c, db, sm, 0)
 	}
 }
 
 // RegisterListCallbacks registers pagination callback handlers.
-func RegisterListCallbacks(b *telebot.Bot, db *gorm.DB) {
+func RegisterListCallbacks(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) {
 	b.Handle(&telebot.InlineButton{Unique: "list_page"}, func(c telebot.Context) error {
 		page, _ := strconv.Atoi(c.Data())
-		return showListPage(b, c, db, page)
+		return showListPage(b, c, db, sm, page)
 	})
 
 	b.Handle(&telebot.InlineButton{Unique: "list_refresh"}, func(c telebot.Context) error {
-		return showListPage(b, c, db, 0)
+		return showListPage(b, c, db, sm, 0)
 	})
 }
 
 // showListPage displays a paginated list of secrets.
-func showListPage(b *telebot.Bot, c telebot.Context, db *gorm.DB, page int) error {
-	userKey, ok := vault.GetKey(c.Sender().ID)
-	if !ok {
+func showListPage(b *telebot.Bot, c telebot.Context, db *gorm.DB, sm *security.SessionManager, page int) error {
+	userKey, err := sm.GetSession(context.Background(), c.Sender().ID)
+	if err != nil {
 		return c.Send("🔒 Sessiya yopiq. `/unlock [so'z]` buyrug'ini yuboring.", telebot.ModeMarkdown)
 	}
 
