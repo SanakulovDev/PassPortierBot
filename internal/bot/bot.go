@@ -44,6 +44,7 @@ func New(db *gorm.DB, sm *security.SessionManager) (*telebot.Bot, error) {
 func RegisterHandlers(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) {
 	b.Handle("/start", HandleOnboarding())
 	b.Handle("/add", handlers.HandleAdd())
+	b.Handle("/passwords", handlers.HandleListWebApp())
 	b.Handle("/settings", user.HandleSettings())
 	b.Handle("/unlock", handlers.HandleUnlock(b, sm, db))
 	b.Handle("/lock", handlers.HandleLock(b, sm))
@@ -69,10 +70,12 @@ func SetCommands(b *telebot.Bot) {
 	commands := []telebot.Command{
 		{Text: "start", Description: "🚀 Botni ishga tushirish"},
 		{Text: "add", Description: "➕ Yangi parol qo'shish"},
-		{Text: "unlock", Description: "🔓 Sessiyani ochish (30 daqiqa)"},
+		{Text: "passwords", Description: "📋 Parol menejeri (Web App)"},
+		{Text: "unlock", Description: "🔓 Sessiyani ochish"},
 		{Text: "lock", Description: "🔒 Sessiyani yopish"},
-		{Text: "list", Description: "📋 Barcha ma'lumotlarni ko'rish"},
-		{Text: "get", Description: "🔍 Ma'lumot olish (masalan: /get instagram)"},
+		{Text: "list", Description: "📝 Parollar ro'yxati (oddiy)"},
+		{Text: "get", Description: "🔍 Parol olish (/get instagram)"},
+		{Text: "settings", Description: "⚙️ Sozlamalar"},
 	}
 
 	if err := b.SetCommands(commands); err != nil {

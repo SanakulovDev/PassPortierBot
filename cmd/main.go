@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"passportier-bot/internal/api"
 	"passportier-bot/internal/bot"
 	"passportier-bot/internal/models"
 	"passportier-bot/internal/security"
@@ -45,5 +46,14 @@ func main() {
 	}
 
 	log.Println("PassPortierBot is running...")
+	
+	// Start API server for Web App
+	apiServer := api.NewServer(db, sessionManager)
+	go func() {
+		if err := apiServer.Start(":8080"); err != nil {
+			log.Printf("API server error: %v", err)
+		}
+	}()
+	
 	b.Start()
 }
