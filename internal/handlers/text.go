@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 
@@ -36,9 +37,20 @@ func HandleText(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) telebo
 			return c.Send("⚠️ Xizmat nomini hash bilan yozing. Misol: `#instagram`")
 		}
 
-		// Block text-based saving
+		// Block text-based saving - show WebApp button
 		if data != "" {
-			return c.Send("🛑 Matn orqali saqlash o'chirilgan.\nIltimos, pastdagi 'Add Password' tugmasidan foydalaning.")
+			webAppURL := os.Getenv("WEBAPP_URL")
+			if webAppURL == "" {
+				webAppURL = "https://your-domain.com/add_password.html"
+			}
+
+			menu := &telebot.ReplyMarkup{ResizeKeyboard: true}
+			btnWebApp := menu.WebApp("➕ Parol Qo'shish", &telebot.WebApp{
+				URL: webAppURL,
+			})
+			menu.Reply(menu.Row(btnWebApp))
+
+			return c.Send("🛑 Matn orqali saqlash o'chirilgan.\nQuyidagi tugmadan foydalaning:", menu)
 		}
 
 		return handleRetrieve(c, b, db, sm, serviceName)

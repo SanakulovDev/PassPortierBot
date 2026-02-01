@@ -1,6 +1,8 @@
 package bot
 
 import (
+	"os"
+
 	"gopkg.in/telebot.v3"
 )
 
@@ -26,8 +28,14 @@ Men sizning ma'lumotlaringizni *Zero-Knowledge* tamoyili asosida himoyalayman.
 Boshlash uchun pastdagi tugmani bosing 👇`
 
 		menu := &telebot.ReplyMarkup{}
+		
+		webAppURL := os.Getenv("WEBAPP_URL")
+		if webAppURL == "" {
+			webAppURL = "https://your-domain.com/add_password.html"
+		}
+		
 		btnWebApp := menu.WebApp("➕ Parol Qo'shish", &telebot.WebApp{
-			URL: "c", // Replace with actual URL
+			URL: webAppURL,
 		})
 		btnSettings := menu.Text("⚙️ Sozlamalar")
 

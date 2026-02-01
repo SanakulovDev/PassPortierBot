@@ -43,6 +43,7 @@ func New(db *gorm.DB, sm *security.SessionManager) (*telebot.Bot, error) {
 // RegisterHandlers registers all bot command and message handlers.
 func RegisterHandlers(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) {
 	b.Handle("/start", HandleOnboarding())
+	b.Handle("/add", handlers.HandleAdd())
 	b.Handle("/settings", user.HandleSettings())
 	b.Handle("/unlock", handlers.HandleUnlock(b, sm, db))
 	b.Handle("/lock", handlers.HandleLock(b, sm))
@@ -67,6 +68,7 @@ func RegisterHandlers(b *telebot.Bot, db *gorm.DB, sm *security.SessionManager) 
 func SetCommands(b *telebot.Bot) {
 	commands := []telebot.Command{
 		{Text: "start", Description: "🚀 Botni ishga tushirish"},
+		{Text: "add", Description: "➕ Yangi parol qo'shish"},
 		{Text: "unlock", Description: "🔓 Sessiyani ochish (30 daqiqa)"},
 		{Text: "lock", Description: "🔒 Sessiyani yopish"},
 		{Text: "list", Description: "📋 Barcha ma'lumotlarni ko'rish"},
